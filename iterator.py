@@ -12,16 +12,26 @@ class Iterator:
         s_num : means sensors number.
         init_a : initial solver.
         """
+        self.eps = 1e-5
         self.a_num = H.shape[0]
         self.s_num = H.shape[1]
         self.H = H
-        self.init_a = None
-        self.c_new = None
+
+        self.H_real = None
+        self.H_imag = None
+        self.A = None
+        self.init_problem = None
+
+        self.a = None
+        self.C_OLD = None
+        self.problem = None
+        self.result = None
 
         self.construct_init_problem()
         self.construct_problem()
 
     def update_channel(self, H):
+        self.H = H
         self.H_real.value = H.real
         self.H_imag.value = H.imag
 
@@ -34,19 +44,9 @@ class Iterator:
 
         for k in range(self.s_num):
             hk = self.H_real[:, k] + 1j * self.H_imag[:, k]
-            # hk_real = self.H_real[:, k]
-            # hk_imag = self.H_imag[:, k]
             constraints.extend(
                 [cp.real(cp.quad_form(hk, self.A)) >= 1]
-                # [
-                #    cp.quad_form(hk_real, cp.real(self.A))
-                #    + cp.quad_form(hk_imag, cp.real(self.A))
-                #    + 2 * hk_imag @ cp.imag(self.A) @ hk_real
-                #    >= 1
-                # ]
             )  # equal to cp.trace(A @ Hk) >= 1
-            # Hk = np.outer(hi, np.conj(hk))
-            # constraints.extend([cp.real(cp.trace(A @ Hk)) >= 1])
 
         self.init_problem = cp.Problem(objective, constraints)
 
@@ -70,8 +70,7 @@ class Iterator:
         self.H_real.value = H.real
         self.H_imag.value = H.imag
 
-        result = self.init_problem.solve(solver="SCS", verbose=False)
-        print(result)
+        self.init_problem.solve(solver="SCS", verbose=False)
         A_value = self.A.value
         if np.linalg.matrix_rank(A_value) == 1:
             self.init_a = None
@@ -81,7 +80,6 @@ class Iterator:
             eigenvalues_real = eigenvalues.real
             max_index = np.argmax(eigenvalues_real)
             self.init_a = np.sqrt(eigenvalues_real[max_index]) * eigenvectors[max_index]
-            print(self.init_a)
 
         C_OLD = np.zeros((2, self.s_num))
         for k in range(self.s_num):
@@ -90,12 +88,23 @@ class Iterator:
             C_OLD[:, k] = [tmp.real, tmp.imag]
         self.C_OLD.value = C_OLD
 
-    def cal_problem(self):
-        result = self.problem.solve(solver="SCS", verbose=True)
-        print(result)
+    def cal_solver(self):
+        self.result = self.problem.solve(solver="SCS", verbose=False)
+        C_NEW = np.zeros((2, self.s_num))
+        for k in range(self.s_num):
+            hk = self.H[:, k]
+            tmp = np.conj(self.a.value) @ hk
+            C_NEW[:, k] = [tmp.real, tmp.imag]
+        self.C_NEW = C_NEW
 
     def loop(self):
-        pass
+        self.cal_init_solver()
+        while True:
+            self.cal_solver()
+            diff = np.linalg.norm(self.C_NEW - self.C_OLD.value)
+            if diff <= self.eps:
+                break
+            self.C_OLD.value = self.C_NEW
 
 
 if __name__ == "__main__":
@@ -107,11 +116,6 @@ if __name__ == "__main__":
         2
     )
     ite = Iterator(H)
-    ite.cal_init_solver()
-    ite.cal_problem()
-
-    H = (np.random.randn(a_num, s_num) + 1j * np.random.randn(a_num, s_num)) / np.sqrt(
-        2
-    )
-    ite.update_channel(H)
-    ite.cal_init_solver()
+    ite.loop()
+    print(ite.result)
+    print(ite.a.value)
