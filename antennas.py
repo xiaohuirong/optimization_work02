@@ -7,6 +7,9 @@ import numpy as np
 
 from iterator import Iterator
 
+seed = 1
+np.random.seed(seed)
+
 
 def one_simulation(_):
     global a_num, s_num
@@ -19,18 +22,19 @@ def one_simulation(_):
     return ite.result
 
 
-seed = 1
-np.random.seed(seed)
-a_num = 2
-s_num = 3
+s_num = 20
 num_simu = 10000
 num_cores = 12
-sum_result = 0
+sum_results = []
+for a_num in range(1, 11):
+    sum_result = 0
 
-with multiprocessing.Pool(processes=num_cores) as pool:
-    results = pool.map(one_simulation, range(num_simu))
+    with multiprocessing.Pool(processes=num_cores) as pool:
+        results = pool.map(one_simulation, range(num_simu))
 
-sum_result = sum(results)
-sum_result /= num_simu
+    sum_result = sum(np.log10(results))
+    sum_result /= num_simu
+    sum_results.append(sum_result)
+    np.save("antennas.npy", sum_results)
 
-print(sum_result)
+print(sum_results)

@@ -77,7 +77,11 @@ class Iterator:
         self.H_real.value = self.H.real
         self.H_imag.value = self.H.imag
 
-        self.init_result = self.init_problem.solve(solver="SCS", verbose=False)
+        if self.a_num == 1:
+            self.init_result = self.init_problem.solve(solver="MOSEK", verbose=False)
+        else:
+            self.init_result = self.init_problem.solve(solver="SCS", verbose=False)
+
         A_value = self.A.value
         eigenvalues, eigenvectors = np.linalg.eig(A_value)
         # try:
@@ -132,27 +136,6 @@ if __name__ == "__main__":
     s_num = 15
     H = (np.random.randn(a_num, s_num) + 1j * np.random.randn(a_num, s_num)) / np.sqrt(
         2
-    )
-    H = np.array(
-        [
-            [
-                -1.51473207 + 0.07613419j,
-                -0.27382313 + 0.40333406j,
-                0.47853167 + 0.15210837j,
-                -0.64631679 + 1.08877744j,
-                -0.09271474 - 0.49672768j,
-                -0.87575654 + 1.04165954j,
-                -0.06661203 + 0.13203127j,
-                -1.08685733 - 0.30858174j,
-                -0.9051136 + 0.7821169j,
-                2.29892388 + 0.79503577j,
-                0.10647928 + 0.13058578j,
-                0.53828483 - 0.82748696j,
-                -0.00365755 - 0.31346699j,
-                -0.58732198 + 1.95502388j,
-                -1.13413035 - 0.87685706j,
-            ]
-        ]
     )
     ite = Iterator(H.shape[0], H.shape[1])
     ite.load_channel(H)
